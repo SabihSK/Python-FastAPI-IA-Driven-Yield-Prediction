@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-passlib[bcrypt]
+passlib[bcrypt]==1.7.4
 uvicorn
 pydantic[email]
 sqlalchemy[asyncio]

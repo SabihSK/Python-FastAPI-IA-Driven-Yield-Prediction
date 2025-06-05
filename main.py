@@ -28,7 +28,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # <-- Your React frontend
+    allow_origins=["*", "http://localhost:3000"],  # <-- Your React frontend
     allow_credentials=True,
     allow_methods=["*"],  # GET, POST, PUT, DELETE, etc.
     allow_headers=["*"],

@@ -16,10 +16,8 @@ class EmailRequest(BaseModel):
 @router.post("/send-email")
 async def send_email_endpoint(data: EmailRequest):
     try:
-        composed_subject = f"[{data.category}] {data.subject}"
+        composed_subject = f"Wheat Yield Prediction - [{data.category}] {data.subject}"
         composed_body = f"""
-You have a new message from the contact form:
-
 Name: {data.name}
 Email: {data.email}
 Category: {data.category}

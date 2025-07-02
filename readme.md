@@ -114,14 +114,14 @@ Instance ID
 `i-09265beeea28f3f4a` (wheat AI-Driven Solutions instance)
 1. Open an SSH client.
 
-2. Locate your private key file. The key used to launch this instance is wheat AI-Driven Solutions pem file.pem
+2. Locate your private key file. The key used to launch this instance is wheat_AI-Driven_Solutions_pem_file.pem
 
 3. Run this command, if necessary, to ensure your key is not publicly viewable.
-`chmod 400 "wheat AI-Driven Solutions pem file.pem"`
+`chmod 400 "wheat_AI-Driven_Solutions_pem_file.pem"`
 
 4. Connect to your instance using its Public DNS:
 `ec2-18-215-153-196.compute-1.amazonaws.com`
 
 Example:
 
-`ssh -i "wheat AI-Driven Solutions pem file.pem" ubuntu@ec2-18-215-153-196.compute-1.amazonaws.com`
+`ssh -i "wheat_AI-Driven_Solutions_pem_file.pem" ubuntu@ec2-18-215-153-196.compute-1.amazonaws.com`

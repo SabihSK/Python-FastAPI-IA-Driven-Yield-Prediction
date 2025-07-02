@@ -16,34 +16,41 @@ class RuleBasedIrrigationModel:
 
     def _load_weather_data(self):
         try:
-            # Construct the correct path relative to the current file
             current_dir = os.path.dirname(os.path.abspath(__file__))
             file_path = os.path.join(
-                current_dir,
-                self.weather_data_dir,
-                f"{self.location}.csv"
+                current_dir, self.weather_data_dir, f"{self.location}.csv"
             )
-            logging.debug(f"Loading weather data from {file_path}")
             df = pd.read_csv(file_path)
             df.rename(columns=lambda x: x.strip(), inplace=True)
             df.columns = [
-                col.encode("ascii", "ignore").decode("ascii")
-                for col in df.columns
+                col.encode("ascii", "ignore").decode("ascii") for col in df.columns
             ]
-            df["Timestamp"] = pd.to_datetime(df["Timestamp"])
-            logging.debug(f"Loaded weather data: {df.head()}")
+
+            # Detect timestamp column (case-insensitive)
+            timestamp_col = next(
+                (c for c in df.columns if c.lower() == "timestamp"), None
+            )
+            if not timestamp_col:
+                raise ValueError("No 'Timestamp' column found in CSV.")
+
+            df.rename(columns={timestamp_col: "Timestamp"}, inplace=True)
+
+            # Try to parse timestamp; handle multiple formats
+            try:
+                df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+            except Exception:
+                # Handle custom format like 20241101T0000
+                df["Timestamp"] = pd.to_datetime(df["Timestamp"], format="%Y%m%dT%H%M")
+
             return df
+
         except FileNotFoundError:
-            logging.error(f"Weather file for '{self.location}' not found.")
             raise HTTPException(
-                status_code=404,
-                detail=f"Weather file for '{self.location}' not found."
+                status_code=404, detail=f"Weather file for '{self.location}' not found."
             )
         except Exception as e:
-            logging.error(f"Unexpected error while loading data: {e}")
             raise HTTPException(
-                status_code=500,
-                detail="Error loading weather data"
+                status_code=500, detail=f"Error loading weather data: {str(e)}"
             )
 
     def check_irrigation_per_land(self, check_date):
@@ -55,10 +62,7 @@ class RuleBasedIrrigationModel:
 
             window = self.weather_data[
                 (self.weather_data["Timestamp"] >= check_date)
-                & (
-                    self.weather_data["Timestamp"]
-                    <= check_date + timedelta(days=4)
-                )
+                & (self.weather_data["Timestamp"] <= check_date + timedelta(days=4))
             ]
 
             if window.empty:
@@ -72,52 +76,54 @@ class RuleBasedIrrigationModel:
                 if latest_data.empty:
                     logging.error("No weather data available at all.")
                     raise HTTPException(
-                        status_code=404,
-                        detail="No weather data available at all."
+                        status_code=404, detail="No weather data available at all."
                     )
                 window = latest_data.tail(1)
 
-            total_rain = window["Faisalabad Precipitation Total"].sum()
-            max_temp = window[
-                "Faisalabad Temperature [2 m elevation corrected]"
-            ].max()
-            et = window["Faisalabad Evapotranspiration"].sum()
+            prefix = self.location.title()
+
+            def get_column(df, keyword):
+                for col in df.columns:
+                    if (
+                        col.lower().startswith(f"{prefix.lower()}")
+                        and keyword.lower() in col.lower()
+                    ):
+                        return col
+                raise ValueError(f"Column matching '{prefix} {keyword}' not found")
+
+            rain_col = get_column(window, "Precipitation Total")
+            temp_col = get_column(window, "Temperature [2 m elevation corrected]")
+            et_col = get_column(window, "Evapotranspiration")
+
+            total_rain = window[rain_col].sum()
+            max_temp = window[temp_col].max()
+            et = window[et_col].sum()
             deficit = et - total_rain
 
             irrigation_required = False
             reason = ""
             if total_rain > 15:
                 reason = (
-                    f"Rain forecast ({total_rain:.1f} mm), "
-                    "irrigation not needed."
+                    f"Rain forecast ({total_rain:.1f} mm), " "irrigation not needed."
                 )
             elif deficit > 20:
                 irrigation_required = True
-                reason = (
-                    f"Water deficit of {deficit:.1f} mm. "
-                    "Irrigation required."
-                )
+                reason = f"Water deficit of {deficit:.1f} mm. " "Irrigation required."
             elif max_temp > 35:
                 irrigation_required = True
-                reason = (
-                    f"High temperature ({max_temp:.1f}°C). "
-                    "Irrigation required."
-                )
+                reason = f"High temperature ({max_temp:.1f}°C). " "Irrigation required."
 
             results = []
             for i, area in enumerate(self.land_areas):
                 water_mm = 75 if irrigation_required else 0
-                water_liters = (
-                    water_mm * 4047 * area if irrigation_required else 0
-                )
+                water_liters = water_mm * 4047 * area if irrigation_required else 0
                 results.append(
                     {
                         "land_number": i + 1,
                         "land_area_acres": area,
                         "irrigation_required": irrigation_required,
                         "reason": (
-                            reason if reason
-                            else "No critical condition detected"
+                            reason if reason else "No critical condition detected"
                         ),
                         "water_volume_liters": round(water_liters, 2),
                         "date_checked": check_date.strftime("%Y-%m-%d"),
@@ -129,6 +135,5 @@ class RuleBasedIrrigationModel:
         except Exception as e:
             logging.error(f"Error while processing irrigation check: {e}")
             raise HTTPException(
-                status_code=500,
-                detail="Error processing irrigation check"
+                status_code=500, detail="Error processing irrigation check"
             )

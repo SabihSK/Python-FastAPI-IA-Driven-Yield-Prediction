@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db import get_db
@@ -51,7 +51,6 @@ async def crop_history_with_irrigation(
     if not crop_data:
         return {"crop_history": [], "irrigation_check": []}
 
-    # 🔧 Use dict access instead of attribute access
     land_areas = []
     first_location = None
 
@@ -61,9 +60,24 @@ async def crop_history_with_irrigation(
         for land in entry.get("lands", []):
             land_areas.append(land.get("area_acres", 0))
 
+    # 🔁 Map location name to file name
+    location_file_map = {
+        "bahawalnagar": "bahawalnagar",
+        "faisalabad": "faisalabad",
+        "multan": "multan",
+        "rahimyar": "ryk",
+        "rahimyarkhan": "ryk",
+    }
+
+    mapped_location = location_file_map.get(first_location)
+    if not mapped_location:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown location: {first_location}"
+        )
+
     check_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-    model = RuleBasedIrrigationModel(first_location, land_areas)
+    model = RuleBasedIrrigationModel(mapped_location, land_areas)
     irrigation_results = model.check_irrigation_per_land(check_date)
 
     return {"crop_history": crop_data, "irrigation_check": irrigation_results}

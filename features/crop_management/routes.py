@@ -1,9 +1,11 @@
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db import get_db
+from features.irrigation.services import RuleBasedIrrigationModel
 
 from .schemas import LandDeleteRequest, LandUpdate, LocationOut, SaveCropFormRequest
 from .services import delete_lands, get_crop_history, save_crop_form, update_land
@@ -38,3 +40,30 @@ async def update_crop_land(
 ):
     await update_land(land_id, data, db)
     return {"message": "Land updated successfully"}
+
+
+@router.get("/history-with-irrigation/{user_id}")
+async def crop_history_with_irrigation(
+    user_id: int, db: AsyncSession = Depends(get_db)
+):
+    crop_data = await get_crop_history(user_id, db)
+
+    if not crop_data:
+        return {"crop_history": [], "irrigation_check": []}
+
+    # 🔧 Use dict access instead of attribute access
+    land_areas = []
+    first_location = None
+
+    for entry in crop_data:
+        if not first_location and "location" in entry:
+            first_location = entry["location"].lower().replace(" ", "")
+        for land in entry.get("lands", []):
+            land_areas.append(land.get("area_acres", 0))
+
+    check_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    model = RuleBasedIrrigationModel(first_location, land_areas)
+    irrigation_results = model.check_irrigation_per_land(check_date)
+
+    return {"crop_history": crop_data, "irrigation_check": irrigation_results}

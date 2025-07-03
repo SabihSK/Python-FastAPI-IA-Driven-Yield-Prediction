@@ -43,10 +43,6 @@ app = FastAPI(
         "url": "https://wheat-yield-pwa-fyp.vercel.app",
         "email": "wareesha.g20496@iqra.edu.pk",
     },
-    license_info={
-        "name": "MIT License",
-        "url": "https://opensource.org/licenses/MIT",
-    },
 )
 
 app.add_middleware(

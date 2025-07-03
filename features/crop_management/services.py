@@ -61,7 +61,7 @@ async def get_crop_history(user_id: int, db: AsyncSession):
                     "area_acres": land.area_acres,
                     "seed_quantity_kg": land.seed_quantity_kg,
                     "chemical_recommendation": land.chemical_recommendation,
-                    "days_tracked": (datetime.utcnow() - land.created_at).days,
+                    "days_tracked": land.created_at,
                 }
             )
 

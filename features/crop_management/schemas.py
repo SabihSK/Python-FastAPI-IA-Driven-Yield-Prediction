@@ -20,7 +20,7 @@ class LandOut(BaseModel):
     area_acres: float
     seed_quantity_kg: float
     chemical_recommendation: str
-    days_tracked: int
+    days_tracked: datetime
 
 
 class LocationOut(BaseModel):

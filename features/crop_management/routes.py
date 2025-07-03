@@ -49,35 +49,41 @@ async def crop_history_with_irrigation(
     crop_data = await get_crop_history(user_id, db)
 
     if not crop_data:
-        return {"crop_history": [], "irrigation_check": []}
+        return {"crop_history": []}
 
-    land_areas = []
-    first_location = None
-
-    for entry in crop_data:
-        if not first_location and "location" in entry:
-            first_location = entry["location"].lower().replace(" ", "")
-        for land in entry.get("lands", []):
-            land_areas.append(land.get("area_acres", 0))
-
-    # 🔁 Map location name to file name
     location_file_map = {
         "bahawalnagar": "bahawalnagar",
         "faisalabad": "faisalabad",
         "multan": "multan",
-        "rahimyar": "ryk",
         "rahimyarkhan": "ryk",
+        "rahimyar": "ryk",
     }
 
-    mapped_location = location_file_map.get(first_location)
-    if not mapped_location:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown location: {first_location}"
-        )
+    # Iterate each location and enrich each land with irrigation result
+    for entry in crop_data:
+        location_key = entry["location"].lower().replace(" ", "")
+        mapped_location = location_file_map.get(location_key)
 
-    check_date = datetime.utcnow().strftime("%Y-%m-%d")
+        if not mapped_location:
+            continue  # Skip unknown locations
 
-    model = RuleBasedIrrigationModel(mapped_location, land_areas)
-    irrigation_results = model.check_irrigation_per_land(check_date)
+        land_areas = [land["area_acres"] for land in entry.get("lands", [])]
+        check_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-    return {"crop_history": crop_data, "irrigation_check": irrigation_results}
+        model = RuleBasedIrrigationModel(mapped_location, land_areas)
+        irrigation_results = model.check_irrigation_per_land(check_date)
+
+        # Merge irrigation result into land entries
+        for idx, land in enumerate(entry["lands"]):
+            if idx < len(irrigation_results):
+                result = irrigation_results[idx]
+                land.update(
+                    {
+                        "irrigation_required": result["irrigation_required"],
+                        "reason": result["reason"],
+                        "water_volume_liters": result["water_volume_liters"],
+                        "date_checked": result["date_checked"],
+                    }
+                )
+
+    return {"crop_history": crop_data}
